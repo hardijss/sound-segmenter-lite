@@ -1,0 +1,19 @@
+[package]
+name = "audio-splitter"
+version = "1.0.0"
+description = "25 FPS 8n+1 Audio Splitter"
+edition = "2021"
+
+[lib]
+name = "audio_splitter_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

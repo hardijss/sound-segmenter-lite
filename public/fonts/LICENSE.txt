@@ -1,0 +1,7 @@
+Fonts bundled in this directory:
+
+- Inter (variable) — Copyright 2016 The Inter Project Authors
+- JetBrains Mono (variable) — Copyright 2020 The JetBrains Mono Project Authors
+
+Both are licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org
