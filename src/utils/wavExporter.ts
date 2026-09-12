@@ -1,9 +1,10 @@
 import JSZip from 'jszip';
-import { AudioSegment, SplitMarker } from '../types/audio';
+import { AudioSegment, SplitMarker, ChunkingRule } from '../types/audio';
 import {
   DEFAULT_FPS,
+  RULE_8N_PLUS_1,
   getBaseFilename,
-  is8nPlus1,
+  isRuleValid,
   sampleToFrame,
 } from './audioMath';
 
@@ -14,7 +15,8 @@ export function buildAudioSegments(
   audioBuffer: AudioBuffer,
   markers: SplitMarker[],
   originalFilename: string,
-  fps: number = DEFAULT_FPS
+  fps: number = DEFAULT_FPS,
+  rule: ChunkingRule = RULE_8N_PLUS_1
 ): AudioSegment[] {
   const sampleRate = audioBuffer.sampleRate;
   const totalSamples = audioBuffer.length;
@@ -45,7 +47,7 @@ export function buildAudioSegments(
     const endFrame = sampleToFrame(endSample, sampleRate, fps);
     const frameCount = endFrame - startFrame;
 
-    const check8n = is8nPlus1(frameCount);
+    const ruleCheck = isRuleValid(frameCount, rule);
 
     // Calculate segment RMS dB
     let sumSquare = 0;
@@ -72,8 +74,10 @@ export function buildAudioSegments(
       endSample,
       durationSeconds,
       frameCount,
-      is8nPlus1: check8n.valid,
-      nValue: check8n.n,
+      isValidRule: ruleCheck.valid,
+      ruleLabel: ruleCheck.valid ? `${rule.name} (n=${ruleCheck.n})` : `Non-${rule.name}`,
+      is8nPlus1: ruleCheck.valid && rule.name === '8n+1',
+      nValue: ruleCheck.n,
       rmsLevelDb: rmsDb,
     });
   }
@@ -84,17 +88,21 @@ export function buildAudioSegments(
 /**
  * Generates a formatted text file content containing the list of segments and frame lengths.
  */
-export function generateFrameManifestText(segments: AudioSegment[], originalFilename: string): string {
+export function generateFrameManifestText(
+  segments: AudioSegment[],
+  originalFilename: string,
+  fps: number = DEFAULT_FPS,
+  ruleName: string = '8n+1'
+): string {
   const lines: string[] = [];
-  lines.push(`# 25 FPS Audio Segment Frame Length Manifest`);
+  lines.push(`# ${fps} FPS Audio Segment Frame Length Manifest (${ruleName})`);
   lines.push(`# Original File: ${originalFilename}`);
   lines.push(`# Total Segments: ${segments.length}`);
-  lines.push(`# Format: [Filename] -> [Frames at 25 FPS] (Duration, 8n+1 Status)`);
+  lines.push(`# Format: [Filename] -> [Frames at ${fps} FPS] (Duration, ${ruleName} Status)`);
   lines.push(``);
 
   segments.forEach((seg) => {
-    const statusStr = seg.is8nPlus1 ? `8n+1 (n=${seg.nValue})` : `Non-8n+1`;
-    lines.push(`${seg.filename}: ${seg.frameCount} frames (${seg.durationSeconds.toFixed(3)}s, ${statusStr})`);
+    lines.push(`${seg.filename}: ${seg.frameCount} frames (${seg.durationSeconds.toFixed(3)}s, ${seg.ruleLabel})`);
   });
 
   lines.push(``);
@@ -222,9 +230,14 @@ export function downloadSegmentAsWav(audioBuffer: AudioBuffer, segment: AudioSeg
 /**
  * Downloads just the text file manifest of segment frame lengths.
  */
-export function downloadFrameManifestTxt(segments: AudioSegment[], originalFilename: string) {
+export function downloadFrameManifestTxt(
+  segments: AudioSegment[],
+  originalFilename: string,
+  fps: number = DEFAULT_FPS,
+  ruleName: string = '8n+1'
+) {
   const baseName = getBaseFilename(originalFilename);
-  const textContent = generateFrameManifestText(segments, originalFilename);
+  const textContent = generateFrameManifestText(segments, originalFilename, fps, ruleName);
   const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
   void saveBlob(blob, `${baseName}_frame_lengths.txt`, [
     { name: 'Text File', extensions: ['txt'] },
@@ -238,10 +251,13 @@ export async function downloadAllSegmentsAsZip(
   audioBuffer: AudioBuffer,
   segments: AudioSegment[],
   originalFilename: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  fps: number = DEFAULT_FPS,
+  rule: ChunkingRule = RULE_8N_PLUS_1
 ) {
   const zip = new JSZip();
   const baseName = getBaseFilename(originalFilename);
+  const ruleSlug = rule.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
   // 1. Add all WAV segment files
   const total = segments.length;
@@ -256,7 +272,7 @@ export async function downloadAllSegmentsAsZip(
   }
 
   // 2. Add text file manifest of frame lengths
-  const textContent = generateFrameManifestText(segments, originalFilename);
+  const textContent = generateFrameManifestText(segments, originalFilename, fps, rule.name);
   zip.file(`${baseName}_frame_lengths.txt`, textContent);
 
   // 3. Generate ZIP archive
@@ -268,18 +284,18 @@ export async function downloadAllSegmentsAsZip(
 
   // In the desktop app the ZIP save panel already established the target
   // directory, so write the manifest next to it without a second dialog.
-  const zipFilename = `${baseName}_25fps_8n1_split.zip`;
+  const zipFilename = `${baseName}_${fps}fps_${ruleSlug}_split.zip`;
   const zipFilters: SaveFilter[] = [{ name: 'ZIP Archive', extensions: ['zip'] }];
   const chosenPath = await saveBlob(content, zipFilename, zipFilters);
 
   if (chosenPath) {
-    const textContent = generateFrameManifestText(segments, originalFilename);
     const manifestBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
     const dir = chosenPath.replace(/[^/]*$/, '');
     const { writeFile } = await import('@tauri-apps/plugin-fs');
     await writeFile(`${dir}${baseName}_frame_lengths.txt`, new Uint8Array(await manifestBlob.arrayBuffer()));
   } else if (!isTauriRuntime()) {
     // Also trigger individual direct download of the .txt file for convenience
-    downloadFrameManifestTxt(segments, originalFilename);
+    downloadFrameManifestTxt(segments, originalFilename, fps, rule.name);
   }
 }
+

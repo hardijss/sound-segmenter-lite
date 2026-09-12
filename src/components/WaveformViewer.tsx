@@ -2,11 +2,12 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { SplitMarker, SplitSettings } from '../types/audio';
 import {
   DEFAULT_FPS,
+  RULE_8N_PLUS_1,
   frameToSample,
   frameToSeconds,
-  is8nPlus1,
+  isRuleValid,
   sampleToFrame,
-  snapFrameTo8nPlus1,
+  snapFrameToRule,
   secondsToFrame,
   formatTime,
 } from '../utils/audioMath';
@@ -43,6 +44,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
   const duration = audioBuffer.duration;
   const sampleRate = audioBuffer.sampleRate;
   const fps = settings.fps || DEFAULT_FPS;
+  const rule = settings.rule || RULE_8N_PLUS_1;
   const totalFrames = Math.round(duration * fps);
 
   // Render canvas waveform
@@ -66,10 +68,10 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     const channelData = audioBuffer.getChannelData(0);
     const totalSamples = channelData.length;
 
-    // Time ruler & 25 FPS grid lines
+    // Time ruler & FPS grid lines
     const frameWidthPx = (width / totalFrames);
     
-    // Draw 25 FPS frame ticks when zoomed in
+    // Draw FPS frame ticks when zoomed in
     if (frameWidthPx >= 4) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
@@ -123,9 +125,9 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       const startX = (bounds[i] / totalFrames) * width;
       const endX = (bounds[i + 1] / totalFrames) * width;
       const frameCount = bounds[i + 1] - bounds[i];
-      const check8n = is8nPlus1(frameCount);
+      const checkRule = isRuleValid(frameCount, rule);
 
-      ctx.fillStyle = check8n.valid
+      ctx.fillStyle = checkRule.valid
         ? (i % 2 === 0 ? 'rgba(56, 189, 248, 0.06)' : 'rgba(99, 102, 241, 0.06)')
         : 'rgba(239, 68, 68, 0.12)';
 
@@ -133,11 +135,11 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
 
       // Label segment frame length
       if (endX - startX > 40) {
-        ctx.fillStyle = check8n.valid ? '#94a3b8' : '#f87171';
+        ctx.fillStyle = checkRule.valid ? '#94a3b8' : '#f87171';
         ctx.font = '11px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        const labelStr = check8n.valid
-          ? `${frameCount}f (8n+1, n=${check8n.n})`
+        const labelStr = checkRule.valid
+          ? `${frameCount}f (${rule.name}, n=${checkRule.n})`
           : `${frameCount}f ⚠️`;
         ctx.fillText(labelStr, (startX + endX) / 2, height - 12);
       }
@@ -275,17 +277,19 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     if (draggingMarkerId) {
       const candidateFrame = getFrameFromClientX(e.clientX);
       
-      // Find previous split point to compute 8n+1 snap
+      // Find previous split point to compute rule snap
       const sorted = [...markers].sort((a, b) => a.frameIndex - b.frameIndex);
       const mIdx = sorted.findIndex((m) => m.id === draggingMarkerId);
       const prevFrame = mIdx > 0 ? sorted[mIdx - 1].frameIndex : 0;
 
       let targetFrame = candidateFrame;
 
-      if (settings.strictlySnapTo8n1) {
-        targetFrame = snapFrameTo8nPlus1(
+      const strictlySnap = settings.strictlySnapToGrid ?? settings.strictlySnapTo8n1 ?? true;
+      if (strictlySnap) {
+        targetFrame = snapFrameToRule(
           prevFrame,
           candidateFrame,
+          rule,
           settings.minFrames,
           settings.maxFrames
         );
@@ -342,7 +346,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const candidateFrame = getFrameFromClientX(e.clientX);
 
-    // Snap to 8n+1 relative to nearest preceding marker
+    // Snap to rule relative to nearest preceding marker
     const sorted = [...markers].sort((a, b) => a.frameIndex - b.frameIndex);
     let prevFrame = 0;
     for (const m of sorted) {
@@ -351,8 +355,9 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       }
     }
 
-    const targetFrame = settings.strictlySnapTo8n1
-      ? snapFrameTo8nPlus1(prevFrame, candidateFrame, settings.minFrames, settings.maxFrames)
+    const strictlySnap = settings.strictlySnapToGrid ?? settings.strictlySnapTo8n1 ?? true;
+    const targetFrame = strictlySnap
+      ? snapFrameToRule(prevFrame, candidateFrame, rule, settings.minFrames, settings.maxFrames)
       : candidateFrame;
 
     const newMarker: SplitMarker = {
@@ -432,7 +437,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       </div>
 
       <div className="waveform-hint">
-        💡 <strong>Tips:</strong> Double-click waveform to insert split marker. Drag vertical markers to adjust. Markers automatically snap to 25 FPS $8n+1$ grid points.
+        💡 <strong>Tips:</strong> Double-click waveform to insert split marker. Drag vertical markers to adjust. Markers automatically snap to {fps} FPS ${rule.name}$ grid points.
       </div>
     </div>
   );

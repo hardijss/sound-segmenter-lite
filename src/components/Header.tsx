@@ -6,6 +6,8 @@ interface HeaderProps {
   filename?: string;
   duration?: number;
   sampleRate?: number;
+  fps?: number;
+  ruleName?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -13,6 +15,8 @@ export const Header: React.FC<HeaderProps> = ({
   filename,
   duration,
   sampleRate,
+  fps = 25,
+  ruleName = '8n+1',
 }) => {
   return (
     <header className="app-header">
@@ -21,9 +25,9 @@ export const Header: React.FC<HeaderProps> = ({
           <Scissors className="icon-scissors" />
         </div>
         <div>
-          <h1 className="app-title">AudioSplit <span className="highlight">25FPS 8n+1</span></h1>
+          <h1 className="app-title">AudioSplit <span className="highlight">{fps}FPS {ruleName}</span></h1>
           <p className="app-subtitle">
-            Precision audio segmentation aligned to 25 FPS $8n+1$ frame rules & silence detection
+            Precision audio segmentation aligned to {fps} FPS ${ruleName}$ frame rules & silence detection
           </p>
         </div>
       </div>
@@ -32,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="audio-meta-bar">
           <div className="meta-item">
             <Film className="meta-icon" />
-            <span>25 FPS Grid</span>
+            <span>{fps} FPS Grid ({ruleName})</span>
           </div>
           <div className="meta-item">
             <Clock className="meta-icon" />

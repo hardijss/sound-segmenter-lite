@@ -1,15 +1,16 @@
 import { SplitMarker, SplitSettings } from '../types/audio';
 import {
   DEFAULT_FPS,
+  RULE_8N_PLUS_1,
   getSamplesPerFrame,
-  getValid8nPlus1FrameCounts,
+  getValidRuleFrameCounts,
   frameToSample,
   frameToSeconds,
   sampleToFrame,
 } from './audioMath';
 
 /**
- * Computes per-frame RMS (Root Mean Square) energy of an AudioBuffer at 25 FPS.
+ * Computes per-frame RMS (Root Mean Square) energy of an AudioBuffer at given FPS.
  */
 export function computeFrameEnergy(
   audioBuffer: AudioBuffer,
@@ -52,18 +53,19 @@ export function computeFrameEnergy(
 }
 
 /**
- * Uses Dynamic Programming to find the optimal set of 8n+1 frame split points
- * that land on silent/quiet frames.
+ * Uses Dynamic Programming to find the optimal set of frame split points
+ * that satisfy the active ChunkingRule and land on silent/quiet frames.
  */
-export function detect8nPlus1SplitPoints(
+export function detectSplitPoints(
   audioBuffer: AudioBuffer,
   settings: SplitSettings
 ): SplitMarker[] {
   const fps = settings.fps || DEFAULT_FPS;
+  const rule = settings.rule || RULE_8N_PLUS_1;
   const sampleRate = audioBuffer.sampleRate;
   const { frameRms, frameDb, totalFrames } = computeFrameEnergy(audioBuffer, fps);
 
-  const validFrameLengths = getValid8nPlus1FrameCounts(settings.minFrames, settings.maxFrames);
+  const validFrameLengths = getValidRuleFrameCounts(rule, settings.minFrames, settings.maxFrames);
 
   if (validFrameLengths.length === 0 || totalFrames <= settings.minFrames) {
     return [];
@@ -92,8 +94,8 @@ export function detect8nPlus1SplitPoints(
       const dbVal = f < totalFrames ? frameDb[f] : frameDb[totalFrames - 1];
       const silenceCost = Math.max(0, dbVal + 100); // 0 for quietest, 100 for loud
 
-      // Small penalty preference for mid-range lengths (~121-137 frames ~ 5s)
-      const idealLen = 129; // ~5.16 seconds
+      // Small penalty preference for mid-range lengths (~5.0 seconds)
+      const idealLen = Math.round(5.0 * fps);
       const lengthPenalty = Math.abs(len - idealLen) * 0.05;
 
       const totalCost = dp[prev] + silenceCost + lengthPenalty;
@@ -143,9 +145,9 @@ export function detect8nPlus1SplitPoints(
     if (bestFrame !== -1) {
       curr = bestFrame;
     } else {
-      // Fallback naive uniform 8n+1 splitting
+      // Fallback naive uniform splitting
       let p = 0;
-      const defaultStep = validFrameLengths[Math.floor(validFrameLengths.length / 2)] || 121;
+      const defaultStep = validFrameLengths[Math.floor(validFrameLengths.length / 2)] || Math.round(5.0 * fps);
       while (p + defaultStep < totalFrames) {
         p += defaultStep;
         splitFrames.push(p);
@@ -167,6 +169,11 @@ export function detect8nPlus1SplitPoints(
   return buildSplitMarkers(splitFrames, sampleRate, fps);
 }
 
+/**
+ * Backward compatibility alias for detectSplitPoints
+ */
+export const detect8nPlus1SplitPoints = detectSplitPoints;
+
 function buildSplitMarkers(frameIndices: number[], sampleRate: number, fps: number): SplitMarker[] {
   return frameIndices.map((frameIdx, index) => {
     const sampleIdx = frameToSample(frameIdx, sampleRate, fps);
@@ -182,3 +189,4 @@ function buildSplitMarkers(frameIndices: number[], sampleRate: number, fps: numb
     };
   });
 }
+

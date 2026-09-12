@@ -5,8 +5,15 @@ import { WaveformViewer } from './components/WaveformViewer';
 import { SegmentList } from './components/SegmentList';
 import { ControlPanel } from './components/ControlPanel';
 import { SplitMarker, SplitSettings, AudioSegment } from './types/audio';
-import { DEFAULT_FPS } from './utils/audioMath';
-import { detect8nPlus1SplitPoints } from './utils/silenceDetector';
+import {
+  DEFAULT_FPS,
+  RULE_8N_PLUS_1,
+  sampleToFrame,
+  frameToSample,
+  frameToSeconds,
+  snapFrameToRule,
+} from './utils/audioMath';
+import { detectSplitPoints } from './utils/silenceDetector';
 import { buildAudioSegments } from './utils/wavExporter';
 import { generateDemoAudioBuffer } from './utils/demoAudio';
 import './index.css';
@@ -18,9 +25,11 @@ export const App: React.FC = () => {
 
   const [settings, setSettings] = useState<SplitSettings>({
     fps: DEFAULT_FPS,
+    rule: RULE_8N_PLUS_1,
     minFrames: 73,   // ~2.92 seconds
     maxFrames: 177,  // ~7.08 seconds
     silenceThresholdDb: -35,
+    strictlySnapToGrid: true,
     strictlySnapTo8n1: true,
   });
 
@@ -50,21 +59,51 @@ export const App: React.FC = () => {
     return audioCtxRef.current;
   }, []);
 
-  // Update segments whenever markers or audioBuffer change
+  // Update segments whenever markers, audioBuffer, or settings change
   useEffect(() => {
     if (audioBuffer) {
-      const segs = buildAudioSegments(audioBuffer, markers, originalFilename, settings.fps);
+      const segs = buildAudioSegments(audioBuffer, markers, originalFilename, settings.fps, settings.rule);
       setSegments(segs);
     } else {
       setSegments([]);
     }
-  }, [audioBuffer, markers, originalFilename, settings.fps]);
+  }, [audioBuffer, markers, originalFilename, settings.fps, settings.rule]);
 
   // Run auto silence detection
-  const runAutoDetection = useCallback((buffer: AudioBuffer) => {
-    const detected = detect8nPlus1SplitPoints(buffer, settings);
+  const runAutoDetection = useCallback((buffer: AudioBuffer, currentSettings: SplitSettings = settings) => {
+    const detected = detectSplitPoints(buffer, currentSettings);
     setMarkers(detected);
   }, [settings]);
+
+  // Handle settings change with smooth marker re-quantization to new FPS / rule
+  const handleSettingsChange = (newSettings: SplitSettings) => {
+    if (audioBuffer && markers.length > 0 && (newSettings.fps !== settings.fps || newSettings.rule !== settings.rule)) {
+      const sampleRate = audioBuffer.sampleRate;
+      const fps = newSettings.fps;
+      const rule = newSettings.rule;
+      const strictlySnap = newSettings.strictlySnapToGrid ?? newSettings.strictlySnapTo8n1 ?? true;
+
+      const sorted = [...markers].sort((a, b) => a.sampleIndex - b.sampleIndex);
+      let prevFrame = 0;
+      const updatedMarkers = sorted.map((m) => {
+        let f = sampleToFrame(m.sampleIndex, sampleRate, fps);
+        if (strictlySnap) {
+          f = snapFrameToRule(prevFrame, f, rule, newSettings.minFrames, newSettings.maxFrames);
+        }
+        prevFrame = f;
+        const sample = frameToSample(f, sampleRate, fps);
+        const time = frameToSeconds(f, fps);
+        return {
+          ...m,
+          frameIndex: f,
+          sampleIndex: sample,
+          timeSeconds: time,
+        };
+      });
+      setMarkers(updatedMarkers);
+    }
+    setSettings(newSettings);
+  };
 
   // Handle File Upload
   const handleFileUpload = async (file: File) => {
@@ -189,6 +228,8 @@ export const App: React.FC = () => {
         filename={originalFilename}
         duration={audioBuffer?.duration}
         sampleRate={audioBuffer?.sampleRate}
+        fps={settings.fps}
+        ruleName={settings.rule.name}
       />
 
       <main className="main-content">
@@ -213,7 +254,7 @@ export const App: React.FC = () => {
 
             <ControlPanel
               settings={settings}
-              onSettingsChange={setSettings}
+              onSettingsChange={handleSettingsChange}
               onAutoRedetect={() => audioBuffer && runAutoDetection(audioBuffer)}
               audioBuffer={audioBuffer}
               segments={segments}
@@ -225,6 +266,8 @@ export const App: React.FC = () => {
               audioBuffer={audioBuffer}
               onPreviewSegment={handlePreviewSegment}
               previewingSegmentIndex={previewingSegmentIndex}
+              fps={settings.fps}
+              ruleName={settings.rule.name}
             />
           </div>
         )}

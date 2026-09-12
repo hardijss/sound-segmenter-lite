@@ -9,6 +9,8 @@ interface SegmentListProps {
   audioBuffer: AudioBuffer;
   onPreviewSegment: (segment: AudioSegment) => void;
   previewingSegmentIndex: number | null;
+  fps?: number;
+  ruleName?: string;
 }
 
 export const SegmentList: React.FC<SegmentListProps> = ({
@@ -16,8 +18,10 @@ export const SegmentList: React.FC<SegmentListProps> = ({
   audioBuffer,
   onPreviewSegment,
   previewingSegmentIndex,
+  fps = 25,
+  ruleName = '8n+1',
 }) => {
-  const invalidCount = segments.filter((s) => !s.is8nPlus1).length;
+  const invalidCount = segments.filter((s) => s.isValidRule !== undefined ? !s.isValidRule : !s.is8nPlus1).length;
   const totalSegments = segments.length;
 
   return (
@@ -31,11 +35,11 @@ export const SegmentList: React.FC<SegmentListProps> = ({
         <div className="segments-summary-badges">
           {invalidCount === 0 ? (
             <span className="status-badge badge-success">
-              <CheckCircle2 className="badge-icon" /> All {totalSegments} segments are 25 FPS 8n+1 valid
+              <CheckCircle2 className="badge-icon" /> All {totalSegments} segments are {fps} FPS {ruleName} valid
             </span>
           ) : (
             <span className="status-badge badge-warning">
-              <AlertTriangle className="badge-icon" /> {invalidCount} segment(s) deviate from 8n+1
+              <AlertTriangle className="badge-icon" /> {invalidCount} segment(s) deviate from {ruleName}
             </span>
           )}
         </div>
@@ -49,8 +53,8 @@ export const SegmentList: React.FC<SegmentListProps> = ({
               <th>Output Filename</th>
               <th>Time Range</th>
               <th>Duration</th>
-              <th>25 FPS Frames</th>
-              <th>8n+1 Status</th>
+              <th>{fps} FPS Frames</th>
+              <th>{ruleName} Status</th>
               <th>Avg Volume</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -58,6 +62,7 @@ export const SegmentList: React.FC<SegmentListProps> = ({
           <tbody>
             {segments.map((seg) => {
               const isPlayingThis = previewingSegmentIndex === seg.index;
+              const isValid = seg.isValidRule !== undefined ? seg.isValidRule : !!seg.is8nPlus1;
               return (
                 <tr key={seg.index} className={isPlayingThis ? 'row-active' : ''}>
                   <td className="font-mono text-muted">{seg.index}</td>
@@ -70,13 +75,13 @@ export const SegmentList: React.FC<SegmentListProps> = ({
                     <span className="frame-count-pill">{seg.frameCount} frames</span>
                   </td>
                   <td>
-                    {seg.is8nPlus1 ? (
+                    {isValid ? (
                       <span className="badge-8n1-valid">
-                        ✓ 8n+1 (n={seg.nValue})
+                        ✓ {seg.ruleLabel || `${ruleName} (n=${seg.nValue})`}
                       </span>
                     ) : (
                       <span className="badge-8n1-invalid">
-                        ⚠️ Non-8n+1 ({seg.frameCount}f)
+                        ⚠️ {seg.ruleLabel || `Non-${ruleName} (${seg.frameCount}f)`}
                       </span>
                     )}
                   </td>
