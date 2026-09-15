@@ -16,6 +16,7 @@ interface ControlPanelProps {
   audioBuffer: AudioBuffer;
   segments: AudioSegment[];
   originalFilename: string;
+  onNotify: (message: string) => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -25,6 +26,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   audioBuffer,
   segments,
   originalFilename,
+  onNotify,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -130,6 +132,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         settings.rule
       );
     } catch (err) {
+      onNotify('Export failed. Please try again.');
       console.error('Export error:', err);
     } finally {
       setIsExporting(false);
@@ -140,7 +143,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     downloadFrameManifestTxt(segments, originalFilename, settings.fps, settings.rule.name);
   };
 
-  const strictlySnap = settings.strictlySnapToGrid ?? settings.strictlySnapTo8n1 ?? true;
+  const strictlySnap = settings.strictlySnapToGrid;
 
   // Generate preview sequence of valid lengths
   const previewLengths = getValidRuleFrameCounts(settings.rule, 1, 200).slice(0, 8);
@@ -299,7 +302,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               onSettingsChange({
                 ...settings,
                 strictlySnapToGrid: !strictlySnap,
-                strictlySnapTo8n1: !strictlySnap,
               })
             }
           >

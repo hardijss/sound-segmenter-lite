@@ -45,6 +45,5 @@ export interface SplitSettings {
   maxFrames: number;          // e.g. 177
   silenceThresholdDb: number; // e.g. -35 dB
   strictlySnapToGrid: boolean;// auto-snap dragged markers to valid rule frames
-  strictlySnapTo8n1?: boolean;// backward-compatibility alias
 }
 

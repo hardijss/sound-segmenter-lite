@@ -344,7 +344,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
 
       let targetFrame = candidateFrame;
 
-      const strictlySnap = settings.strictlySnapToGrid ?? settings.strictlySnapTo8n1 ?? true;
+      const strictlySnap = settings.strictlySnapToGrid;
       if (strictlySnap) {
         targetFrame = snapFrameToRule(
           prevFrame,
@@ -415,7 +415,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       }
     }
 
-    const strictlySnap = settings.strictlySnapToGrid ?? settings.strictlySnapTo8n1 ?? true;
+    const strictlySnap = settings.strictlySnapToGrid;
     const targetFrame = strictlySnap
       ? snapFrameToRule(prevFrame, candidateFrame, rule, settings.minFrames, settings.maxFrames)
       : candidateFrame;

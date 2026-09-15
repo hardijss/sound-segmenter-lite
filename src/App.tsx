@@ -22,6 +22,8 @@ export const App: React.FC = () => {
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [originalFilename, setOriginalFilename] = useState<string>('sample_audio.wav');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const [settings, setSettings] = useState<SplitSettings>({
     fps: DEFAULT_FPS,
@@ -30,7 +32,6 @@ export const App: React.FC = () => {
     maxFrames: 177,  // ~7.08 seconds
     silenceThresholdDb: -35,
     strictlySnapToGrid: true,
-    strictlySnapTo8n1: true,
   });
 
   const [markers, setMarkers] = useState<SplitMarker[]>([]);
@@ -59,6 +60,12 @@ export const App: React.FC = () => {
     return audioCtxRef.current;
   }, []);
 
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 5000);
+  }, []);
+
   // Update segments whenever markers, audioBuffer, or settings change
   useEffect(() => {
     if (audioBuffer) {
@@ -81,7 +88,7 @@ export const App: React.FC = () => {
       const sampleRate = audioBuffer.sampleRate;
       const fps = newSettings.fps;
       const rule = newSettings.rule;
-      const strictlySnap = newSettings.strictlySnapToGrid ?? newSettings.strictlySnapTo8n1 ?? true;
+      const strictlySnap = newSettings.strictlySnapToGrid;
 
       const sorted = [...markers].sort((a, b) => a.sampleIndex - b.sampleIndex);
       let prevFrame = 0;
@@ -118,7 +125,7 @@ export const App: React.FC = () => {
       setCurrentTime(0);
       setIsPlaying(false);
     } catch (err) {
-      alert('Failed to decode audio file. Please try another WAV, MP3, or FLAC file.');
+      showToast('Failed to decode audio file. Please try another WAV, MP3, or FLAC file.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -223,6 +230,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {toastMessage && (
+        <div className="toast" role="alert">{toastMessage}</div>
+      )}
       <Header
         hasAudio={!!audioBuffer}
         filename={originalFilename}
@@ -255,6 +265,7 @@ export const App: React.FC = () => {
             <ControlPanel
               settings={settings}
               onSettingsChange={handleSettingsChange}
+              onNotify={showToast}
               onAutoRedetect={() => audioBuffer && runAutoDetection(audioBuffer)}
               audioBuffer={audioBuffer}
               segments={segments}

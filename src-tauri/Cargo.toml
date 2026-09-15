@@ -1,6 +1,6 @@
 [package]
 name = "audio-splitter"
-version = "1.2.0"
+version = "1.2.1"
 description = "25 FPS 8n+1 Audio Splitter"
 edition = "2021"
 

@@ -255,6 +255,23 @@ export async function downloadAllSegmentsAsZip(
   fps: number = DEFAULT_FPS,
   rule: ChunkingRule = RULE_8N_PLUS_1
 ) {
+  // Guard against materializing very large exports in memory: estimate the
+  // uncompressed WAV payload and ask before proceeding on long recordings.
+  const totalSamples = segments.reduce((sum, seg) => sum + (seg.endSample - seg.startSample), 0);
+  const estimatedBytes = totalSamples * audioBuffer.numberOfChannels * 2;
+  const EXPORT_WARN_BYTES = 1 << 30; // 1 GiB
+  if (estimatedBytes > EXPORT_WARN_BYTES) {
+    const sizeGb = (estimatedBytes / (1 << 30)).toFixed(1);
+    const message = `This export is ~${sizeGb} GB of WAV data (${segments.length} segments) and will be built in memory. Continue?`;
+    if (isTauriRuntime()) {
+      const { ask } = await import('@tauri-apps/plugin-dialog');
+      const proceed = await ask(message, { title: 'Large export', kind: 'warning', okLabel: 'Export anyway', cancelLabel: 'Cancel' });
+      if (!proceed) return;
+    } else if (!window.confirm(message)) {
+      return;
+    }
+  }
+
   const zip = new JSZip();
   const baseName = getBaseFilename(originalFilename);
   const ruleSlug = rule.name.toLowerCase().replace(/[^a-z0-9]+/g, '');

@@ -814,3 +814,20 @@ body {
   font-size: 0.775rem;
 }
 
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: min(560px, 90vw);
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: #1e293b;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  font-size: 13.5px;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
