@@ -46,18 +46,36 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
   const rule = settings.rule || RULE_8N_PLUS_1;
   const totalFrames = Math.round(duration * fps);
 
-  // Render canvas waveform
-  const draw = useCallback(() => {
+  // Offscreen layer holding the expensive static content (grid, waveform
+  // peaks, segment tints, markers). It is re-rendered only when its inputs
+  // change - NOT when the playhead moves - so playback redraw cost is O(1)
+  // instead of a full min/max rescan of every sample per frame.
+  const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const ensureStaticLayer = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    if (!canvas) return null;
+    if (!staticCanvasRef.current) staticCanvasRef.current = document.createElement('canvas');
+    const layer = staticCanvasRef.current;
+    if (layer.width !== canvas.width || layer.height !== canvas.height) {
+      layer.width = canvas.width;
+      layer.height = canvas.height;
+    }
+    return layer;
+  }, []);
+
+  // Render the static waveform layer into the offscreen canvas.
+  const renderStatic = useCallback(() => {
+    const layer = ensureStaticLayer();
+    if (!layer) return;
+    const ctx = layer.getContext('2d');
     if (!ctx) return;
 
     // Draw in logical (CSS-pixel) coordinates; the backing store is
     // dpr-scaled so the waveform stays crisp on Retina displays.
     const dpr = window.devicePixelRatio || 1;
-    const width = canvas.width / dpr;
-    const height = canvas.height / dpr;
+    const width = layer.width / dpr;
+    const height = layer.height / dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
@@ -190,6 +208,24 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       ctx.fillText(`${m.frameIndex}f`, x, 18);
     });
 
+  }, [audioBuffer, markers, selectedMarkerId, hoverMarkerId, draggingMarkerId, totalFrames, rule, ensureStaticLayer]);
+
+  // Composite pass: blit the static layer, then draw the playhead.
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const layer = staticCanvasRef.current;
+    if (layer && layer.width === canvas.width && layer.height === canvas.height) {
+      ctx.drawImage(layer, 0, 0, width, height);
+    }
+
     // Playhead line
     const playheadX = (currentTime / duration) * width;
     ctx.strokeStyle = '#ef4444';
@@ -205,7 +241,16 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     ctx.arc(playheadX, 6, 6, 0, Math.PI * 2);
     ctx.fill();
 
-  }, [audioBuffer, markers, selectedMarkerId, hoverMarkerId, draggingMarkerId, currentTime, duration, totalFrames, rule]);
+  }, [currentTime, duration]);
+
+  // Keep latest callbacks reachable from the resize observer without
+  // re-subscribing it on every render.
+  const renderStaticRef = useRef(renderStatic);
+  const drawRef = useRef(draw);
+  useEffect(() => {
+    renderStaticRef.current = renderStatic;
+    drawRef.current = draw;
+  });
 
   // Canvas size sync
   useEffect(() => {
@@ -221,18 +266,24 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       // so zoom now magnifies the view and horizontal scrolling engages.
       canvas.style.width = `${zoom * 100}%`;
       canvas.style.height = '200px';
-      draw();
+      renderStaticRef.current();
+      drawRef.current();
     };
 
     syncCanvasSize();
     const resizeObserver = new ResizeObserver(syncCanvasSize);
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
-  }, [draw, zoom]);
+  }, [zoom]);
 
   useEffect(() => {
+    renderStatic();
+  }, [renderStatic]);
+
+  // Runs after every render: the playhead advances each animation frame.
+  useEffect(() => {
     draw();
-  }, [draw]);
+  });
 
   // Pointer event handlers for marker dragging & clicking
   const getFrameFromClientX = (clientX: number): number => {
