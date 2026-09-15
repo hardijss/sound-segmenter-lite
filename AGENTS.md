@@ -13,7 +13,7 @@ This document establishes operational principles, architectural rules, and codin
 2. **Empirical Verification Required**:
    - **Never declare success** after making code changes without compiling and verifying.
    - Always execute `npm run build` to confirm zero TypeScript compilation errors.
-   - Run verification scripts (e.g. `node test_runner.js`) to validate frame arithmetic and silence detection logic before finishing a task.
+   - Run the vitest suite (`npm test`, spec files in `src/utils/*.test.ts`) to validate frame arithmetic, silence detection, and WAV encoding before finishing a task.
 
 3. **No Symptom Swallowing**:
    - If an audio decoding, export, or rendering step fails, diagnose the underlying cause (e.g. invalid sample buffer range or DataView offset). Never wrap missing data in empty try/catch blocks or return blank array buffers.
@@ -75,8 +75,8 @@ Whenever modifying files in this codebase, run the following verification steps:
 # 1. Type check & Vite build verification
 npm run build
 
-# 2. Run mathematical unit test verification (if test script exists)
-node test_runner.js
+# 2. Run the vitest suite (frame math, silence detection, WAV encoding)
+npm test
 ```
 
 ---
