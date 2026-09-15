@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Music, FileAudio, Sparkles } from 'lucide-react';
+import { Upload, Sparkles } from 'lucide-react';
 
 interface AudioUploaderProps {
   onFileUpload: (file: File) => void;

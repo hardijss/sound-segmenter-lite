@@ -1,5 +1,5 @@
 import React from 'react';
-import { Scissors, Film, Clock, Sparkles } from 'lucide-react';
+import { Scissors, Film, Clock } from 'lucide-react';
 
 interface HeaderProps {
   hasAudio: boolean;

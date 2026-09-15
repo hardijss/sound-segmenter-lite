@@ -6,12 +6,11 @@ import {
   frameToSample,
   frameToSeconds,
   isRuleValid,
-  sampleToFrame,
   snapFrameToRule,
   secondsToFrame,
   formatTime,
 } from '../utils/audioMath';
-import { Play, Pause, ZoomIn, ZoomOut, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { Play, Pause, ZoomIn, ZoomOut, Trash2 } from 'lucide-react';
 
 interface WaveformViewerProps {
   audioBuffer: AudioBuffer;
@@ -206,7 +205,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     ctx.arc(playheadX, 6, 6, 0, Math.PI * 2);
     ctx.fill();
 
-  }, [audioBuffer, markers, selectedMarkerId, hoverMarkerId, draggingMarkerId, currentTime, duration, totalFrames, fps]);
+  }, [audioBuffer, markers, selectedMarkerId, hoverMarkerId, draggingMarkerId, currentTime, duration, totalFrames, rule]);
 
   // Canvas size sync
   useEffect(() => {
@@ -347,7 +346,7 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
       setDraggingMarkerId(null);
       try {
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {
+      } catch {
         // ignore
       }
     }

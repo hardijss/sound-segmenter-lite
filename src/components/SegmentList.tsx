@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AudioSegment } from '../types/audio';
 import { downloadSegmentAsWav } from '../utils/wavExporter';
 import { Play, Pause, Download, CheckCircle2, AlertTriangle, FileAudio } from 'lucide-react';

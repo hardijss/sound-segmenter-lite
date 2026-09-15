@@ -6,7 +6,6 @@ import {
   getValidRuleFrameCounts,
   frameToSample,
   frameToSeconds,
-  sampleToFrame,
 } from './audioMath';
 
 /**
@@ -63,7 +62,7 @@ export function detectSplitPoints(
   const fps = settings.fps || DEFAULT_FPS;
   const rule = settings.rule || RULE_8N_PLUS_1;
   const sampleRate = audioBuffer.sampleRate;
-  const { frameRms, frameDb, totalFrames } = computeFrameEnergy(audioBuffer, fps);
+  const { frameDb, totalFrames } = computeFrameEnergy(audioBuffer, fps);
 
   const validFrameLengths = getValidRuleFrameCounts(rule, settings.minFrames, settings.maxFrames);
 
@@ -111,8 +110,6 @@ export function detectSplitPoints(
       // Find closest valid length from back
       for (let prev = totalFrames - settings.maxFrames; prev <= totalFrames - settings.minFrames; prev++) {
         if (prev >= 0 && dp[prev] < INF) {
-          const remLen = totalFrames - prev;
-          // check if remLen can be approximated or allowed
           const cost = dp[prev] + 10;
           if (cost < minCost) {
             minCost = cost;

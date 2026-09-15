@@ -146,7 +146,7 @@ export const App: React.FC = () => {
       try {
         sourceNodeRef.current.stop();
         sourceNodeRef.current.disconnect();
-      } catch (err) {
+      } catch {
         // ignore
       }
       sourceNodeRef.current = null;

@@ -43,7 +43,7 @@ This application automates the process by finding natural pauses or silent momen
 Every split segment duration in frames must satisfy:
 $$N_{\text{frames}} = 8n + 1, \quad \text{where } n \in \mathbb{Z}_{\ge 0}$$
 
-For the default **3 to 7 second** segment target range ($75$ to $175$ frames), the valid $8n+1$ frame lengths are:
+For the default **3 to 7 second** segment target range ($73$ to $177$ frames), the valid $8n+1$ frame lengths are:
 
 | $n$ | Frame Count ($N$) | Duration (25 FPS) |
 |---|---|---|

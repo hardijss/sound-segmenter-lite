@@ -4,8 +4,6 @@ import { downloadAllSegmentsAsZip, downloadFrameManifestTxt } from '../utils/wav
 import {
   PRESETS,
   STANDARD_FPS_OPTIONS,
-  RULE_8N_PLUS_1,
-  RULE_17N_PLUS_5,
   frameToSeconds,
   getValidRuleFrameCounts,
 } from '../utils/audioMath';
