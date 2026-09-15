@@ -54,8 +54,12 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    // Draw in logical (CSS-pixel) coordinates; the backing store is
+    // dpr-scaled so the waveform stays crisp on Retina displays.
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
     // Background gradient
@@ -210,12 +214,19 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      canvas.width = container.clientWidth * zoom;
-      canvas.height = 200;
+    const syncCanvasSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(container.clientWidth * zoom * dpr));
+      canvas.height = Math.round(200 * dpr);
+      // The element itself grows with zoom inside the scrollable container,
+      // so zoom now magnifies the view and horizontal scrolling engages.
+      canvas.style.width = `${zoom * 100}%`;
+      canvas.style.height = '200px';
       draw();
-    });
+    };
 
+    syncCanvasSize();
+    const resizeObserver = new ResizeObserver(syncCanvasSize);
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
   }, [draw, zoom]);
@@ -240,7 +251,6 @@ export const WaveformViewer: React.FC<WaveformViewerProps> = ({
     if (!canvas) return;
 
     // Check if clicked near existing marker
-    const width = canvas.width;
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
 
